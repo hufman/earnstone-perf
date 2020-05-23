@@ -14,8 +14,6 @@ public class SampleUsageTest implements CallbackCounter.CounterUpdate {
 	@Test
 	public void basicUsage() throws IOException {
 
-		Registry.setShouldRegisterJmx(true);
-
 		IncrementCounter incrementCounter = new IncrementCounter();
 		incrementCounter.setCategory("Sample");
 		incrementCounter.setGroup("group1");

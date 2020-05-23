@@ -11,8 +11,6 @@ public class RegistryTest {
 	@Test
 	public void basicTest() {
 		
-		Registry.setShouldRegisterJmx(true);
-		
 		IncrementCounter incrementCounter = new IncrementCounter();		
 		incrementCounter.setCategory("RegistryTest");
 		incrementCounter.setGroup("group1");

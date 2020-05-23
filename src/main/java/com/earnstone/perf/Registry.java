@@ -17,17 +17,11 @@
  */
 package com.earnstone.perf;
 
-import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
-
-import com.sun.jdmk.comm.HtmlAdaptorServer;
 
 /**
  * A central thread-safe repository for counters. Although it is not required to
@@ -40,7 +34,6 @@ import com.sun.jdmk.comm.HtmlAdaptorServer;
  */
 public class Registry {
 
-	private static boolean shouldRegisterJmx;
 	private static HashMap<String, String> alreadSeen;
 	private static LinkedHashMap<String, Counter> perfs;
 
@@ -76,8 +69,6 @@ public class Registry {
 			String key = String.format(KeyFormat, perf.getCategory(), perf.getGroup(), perf.getName());
 
 			Counter previous = perfs.put(key, perf);
-			if (shouldRegisterJmx)
-				registerCounterAsJmx(perf);
 
 			return previous;
 		}
@@ -211,71 +202,5 @@ public class Registry {
 		synchronized (perfs) {
 			return perfs.get(String.format(KeyFormat, category, group, name));
 		}
-	}
-
-	private static void registerCounterAsJmx(Counter counter) {
-
-		boolean seenInThisContext = alreadSeen.containsKey(counter.getCategory() + "::" + counter.getGroup());
-
-		try {
-			MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
-			JmxWrapper jmxWrapper = new JmxWrapper(counter.getCategory(), counter.getGroup());
-			ObjectName objectName = new ObjectName(jmxWrapper.getObjectTypeName());
-
-			if (seenInThisContext == false && mbs.isRegistered(objectName)) {
-				// This is a funky case when running inside a servlet container
-				// like
-				// Tomcat who unregisters the war file and it's classes. So the
-				// MBeanServer still sees a ref to the class, but it was
-				// unloaded
-				// By the Tomcat class loader. So we need to unregister the
-				// old jmx bean and re-register with a new one.
-				mbs.unregisterMBean(objectName);
-			}
-
-			if (!mbs.isRegistered(objectName)) {
-				mbs.registerMBean(jmxWrapper, objectName);
-				alreadSeen.put(counter.getCategory() + "::" + counter.getGroup(), null);
-			}
-		}
-		catch (Exception e) {
-			throw new IllegalArgumentException("The performance counter cannot be registered as a Jmx Bean InnerException=" + e.toString());
-		}
-	}
-
-	public static void registerJmxHtmlAdapter(int port) {
-
-		if (shouldRegisterJmx) {
-			try {
-				String name = "com.earnstone.perf:type=HtmlAdapter";
-				boolean seenInThisContext = alreadSeen.containsKey(name);
-
-				MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
-				ObjectName adapterName = new ObjectName(name);
-				
-				if (seenInThisContext == false && mbs.isRegistered(adapterName)) {					
-					mbs.unregisterMBean(adapterName);
-				}
-				
-				if (!mbs.isRegistered(adapterName)) {
-					HtmlAdaptorServer adapter = new HtmlAdaptorServer();
-					adapter.setPort(port);
-					mbs.registerMBean(adapter, adapterName);
-					adapter.start();
-					alreadSeen.put(name, null);
-				}
-			}
-			catch (Exception e) {
-				throw new IllegalArgumentException("The Jmx Html adaper cannot be registered as a Jmx Bean InnerException=" + e.toString());
-			}
-		}
-	}
-
-	public static void setShouldRegisterJmx(boolean shouldRegisterJmx) {
-		Registry.shouldRegisterJmx = shouldRegisterJmx;
-	}
-
-	public static boolean isShouldRegisterJmx() {
-		return shouldRegisterJmx;
 	}
 }
